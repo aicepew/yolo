@@ -65,6 +65,9 @@ def process_video_with_tracking(input_video_path, show_video=True, save_video=Fa
                                 output_video_path="output_video.mp4"):
     # Open the input video file
     cap = cv2.VideoCapture(input_video_path)
+    
+    model = YOLO('train11/weights/best.pt') #'yolov5n.pt'
+    model.fuse()
 
     if not cap.isOpened():
         raise Exception("Error: Could not open video file.")
@@ -166,9 +169,9 @@ def process_video_with_tracking(input_video_path, show_video=True, save_video=Fa
 # Example usage:
 # Запуск трекера в отдельном потоке
 # model = YOLO('train11/weights/best.pt')
-model = YOLO('train11/weights/best.pt') #'yolov5n.pt'
+
 #model_detect = YOLO('train11/weights/best.pt')
-model.fuse()
+
 #model_detect.fuse()
 results = process_video_with_tracking('/media/pavel/data/techmash/datasets/nivaCar/IMG_4377.mov', show_video=True, save_video=False,
                                                       output_video_path="output_video.mp4")
