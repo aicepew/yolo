@@ -4,6 +4,23 @@ import random
 import socket
 import struct
 import datetime
+import os
+
+
+current_datetime = datetime.datetime.now()
+formatted_datetime = current_datetime.strftime("%Y_%m_%d_%H_%M_%S")
+save_dir = 'images/'
+
+if not os.path.exists(save_dir):
+    # Create the directory
+    os.makedirs(save_dir)
+
+    print(f"Directory '{save_dir}' created successfully.")
+else:
+    print(f"Directory '{save_dir}' already exists.")
+
+path2dir = f'{save_dir}/date_{formatted_datetime}'
+os.makedirs(path2dir)
 
 # Время в миллисекундах от начала суток
 def current_milli_time():
@@ -13,6 +30,7 @@ def current_milli_time():
     return round(milliseconds_from_midnight)
 
 
+
 # Функция для отправки данных по UDP
 def send_udp_data(data):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -20,7 +38,7 @@ def send_udp_data(data):
     sock.close()
 
 
-def process_video_with_tracking(input_video_path, show_video=True, save_video=False,
+def process_video_with_tracking(input_video_path, show_video=True, save_photos=False, save_video=False,
                                 output_video_path="output_video.mp4"):
     # Open the input video file
     cap = cv2.VideoCapture(input_video_path)
@@ -50,30 +68,24 @@ def process_video_with_tracking(input_video_path, show_video=True, save_video=Fa
 
         results = model.track(frame, iou=0.4, conf=0.5, persist=True, imgsz=608, verbose=False,
                               tracker="bytetrack.yaml", classes=0)
-
-        section1 = bytes([0xAA])  # Заголовок
-        section2 = bytearray(struct.pack("I", 123124))  # Текущее время
-        section3 = bytearray(struct.pack("I", 1))  # Номер снимка
-        section4 = bytearray(struct.pack("h", 640))  # Ширина кадра с камеры
-        section5 = bytearray(struct.pack("h", 480))  # Высота кадра с камеры
-        section6 = bytearray(struct.pack("B", 1))  # ID объекта
-        section7 = bytearray(struct.pack("f", 0.3))  # Величина отклика трекера
-        section8 = bytearray(struct.pack("h", 460))  # Положение левого верхнего угла X
-        section9 = bytearray(struct.pack("h", 360))  # Положение левого верхнего угла Y
-        section10 = bytearray(struct.pack("h", -560))  # Ширина рамки
-        section11 = bytearray(struct.pack("h", -680))  # Высота рамки
-        section12 = bytes([0xBB])
-
-        packed_data = (section1 + section2 + section3 + section4 + section5 + section6 +
-                       section7 + section8 + section9 + section10 + section11 + section12)
+        
+        if save_photos:
+            image_filename = f'{path2dir}/image_{counterPhoto}.bmp'
+            cv2.imwrite(image_filename, frame)
+            print(f"Image saved: {image_filename}")
+        
         # send_udp_data(packed_data)
 
         if results[0].boxes.id is not None:  # this will ensure that id is not None -> exist tracks
             boxes = results[0].boxes.xyxy.cpu().numpy().astype(int)
             ids = results[0].boxes.id.cpu().numpy().astype(int)
-            #print(results[0].boxes.confidence)
+            confidences = results[0].boxes.conf.cpu().numpy().astype(float)
+           
+            #confidence = results[0].keypoints
+            #confidences = results[0].obb
+            
 
-            for box, id in zip(boxes, ids):
+            for box, id, conf in zip(boxes, ids, confidences):
                 # Generate a random color for each object based on its ID
                 trasholdData = 0
                 random.seed(int(id))
@@ -85,16 +97,15 @@ def process_video_with_tracking(input_video_path, show_video=True, save_video=Fa
                 section4 = bytearray(struct.pack("h", frame_width))  # Ширина кадра с камеры
                 section5 = bytearray(struct.pack("h", frame_height))  # Высота кадра с камеры
                 section6 = bytearray(struct.pack("B", int(id)))  # ID объекта
-                section7 = bytearray(struct.pack("f", trasholdData))  # Величина отклика трекера
+                section7 = bytearray(struct.pack("f", float(conf)))  # Величина отклика трекера
                 section8 = bytearray(struct.pack("h", box[0]))  # Положение левого верхнего угла X
                 section9 = bytearray(struct.pack("h", box[1]))  # Положение левого верхнего угла Y
                 section10 = bytearray(struct.pack("h", box[2] - box[0]))  # Ширина рамки
                 section11 = bytearray(struct.pack("h", box[3] - box[1]))  # Высота рамки
                 section12 = bytes([0xBB])
-                # section12 = bytes(crc8(crcdata))
 
                 packed_data = (section1 + section2 + section3 + section4 + section5 + section6 +
-                               section7 + section8 + section9 + section10 + section11 + section12)
+                                section7 + section8 + section9 + section10 + section11 + section12)
                 send_udp_data(packed_data)
 
                 cv2.rectangle(frame, (box[0], box[1]), (box[2], box[3],), color, 2)
@@ -107,12 +118,28 @@ def process_video_with_tracking(input_video_path, show_video=True, save_video=Fa
                     (0, 255, 255),
                     2,
                 )
-
+        else:
+            section1 = bytes([0xAA])  #Заголовок
+            section2 = bytearray(struct.pack("I", current_milli_time() & 0xFFFFFFFF))  # Текущее время
+            section3 = bytearray(struct.pack("I", counterPhoto))  # Номер снимка
+            section4 = bytearray(struct.pack("h", frame_width))  # Ширина кадра с камеры
+            section5 = bytearray(struct.pack("h", frame_height))  # Высота кадра с камеры
+            section6 = bytearray(struct.pack("B", 0))  # ID объекта
+            section7 = bytearray(struct.pack("f", 0.0))  # Величина отклика трекера
+            section8 = bytearray(struct.pack("h", 0))  # Положение левого верхнего угла X
+            section9 = bytearray(struct.pack("h", 0))  # Положение левого верхнего угла Y
+            section10 = bytearray(struct.pack("h", 0))  # Ширина рамки
+            section11 = bytearray(struct.pack("h", 0))  # Высота рамки
+            section12 = bytes([0xBB])
+            packed_data = (section1 + section2 + section3 + section4 + section5 + section6 +
+                        section7 + section8 + section9 + section10 + section11 + section12)
+            send_udp_data(packed_data)
+            
         if save_video:
             out.write(frame)
 
         if show_video:
-            frame = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
+            frame = cv2.resize(frame, (0, 0), fx=1, fy=1)
             cv2.imshow("frame", frame)
 
         if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -133,8 +160,8 @@ def process_video_with_tracking(input_video_path, show_video=True, save_video=Fa
 # model = YOLO('train11/weights/best.pt')
 
 # model_detect = YOLO('train11/weights/best.pt')
-
+save_photo = True
 # model_detect.fuse()
-results = process_video_with_tracking('/media/pavel/data/techmash/datasets/nivaCar/IMG_4377.mov', show_video=True,
+results = process_video_with_tracking('/media/pavel/data/techmash/datasets/nivaCar/IMG_4377.mov', show_video=True, save_photos=False,
                                       save_video=False,
                                       output_video_path="output_video.mp4")
