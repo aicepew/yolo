@@ -4,7 +4,6 @@ import random
 import socket
 import struct
 import datetime
-import torch
 
 
 def crc8(data):
@@ -39,34 +38,12 @@ def send_udp_data(data):
     sock.close()
 
 
-def draw_bounding_boxes_without_id(frame, results):
-    boxes = results[0].boxes.xyxy.cpu().numpy().astype(int)
-    classes = results[0].boxes.cls.cpu().numpy().astype(int)
-
-    for box, clss in zip(boxes, classes):
-        # Generate a random color for each object based on its ID
-        if clss != 0:
-            random.seed(int(clss) + 8)
-            color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-            cv2.rectangle(frame, (box[0], box[1]), (box[2], box[3],), color, 2)
-            cv2.putText(
-                frame,
-                f"{model.model.names[clss]}",
-                (box[0], box[1]),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                (50, 255, 50),
-                2,
-            )
-    return frame
-
-
 def process_video_with_tracking(input_video_path, show_video=True, save_video=False,
                                 output_video_path="output_video.mp4"):
     # Open the input video file
     cap = cv2.VideoCapture(input_video_path)
-    
-    model = YOLO('train11/weights/best.pt') #'yolov5n.pt'
+
+    model = YOLO('model/train11/weights/best.pt')  # 'yolov5n.pt'
     model.fuse()
 
     if not cap.isOpened():
@@ -88,6 +65,7 @@ def process_video_with_tracking(input_video_path, show_video=True, save_video=Fa
         if not ret:
             break
         counterPhoto += 1
+
         results = model.track(frame, iou=0.4, conf=0.5, persist=True, imgsz=608, verbose=False,
                               tracker="bytetrack.yaml", classes=0)
 
@@ -105,11 +83,13 @@ def process_video_with_tracking(input_video_path, show_video=True, save_video=Fa
         section12 = bytes([0xBB])
 
         packed_data = (section1 + section2 + section3 + section4 + section5 + section6 +
-                     section7 + section8 + section9 + section10 + section11 + section12)
-        #send_udp_data(packed_data)
+                       section7 + section8 + section9 + section10 + section11 + section12)
+        # send_udp_data(packed_data)
+
         if results[0].boxes.id is not None:  # this will ensure that id is not None -> exist tracks
             boxes = results[0].boxes.xyxy.cpu().numpy().astype(int)
             ids = results[0].boxes.id.cpu().numpy().astype(int)
+            print(results[0].boxes.confidence)
 
             for box, id in zip(boxes, ids):
                 # Generate a random color for each object based on its ID
@@ -117,23 +97,23 @@ def process_video_with_tracking(input_video_path, show_video=True, save_video=Fa
                 random.seed(int(id))
                 color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
 
-                # section1 = bytes([0xAA])  # Заголовок
-                # section2 = bytearray(struct.pack("I", current_milli_time() & 0xFFFFFFFF))  # Текущее время
-                # section3 = bytearray(struct.pack("I", counterPhoto))  # Номер снимка
-                # section4 = bytearray(struct.pack("h", frame_width))  # Ширина кадра с камеры
-                # section5 = bytearray(struct.pack("h", frame_height))  # Высота кадра с камеры
-                # section6 = bytearray(struct.pack("B", int(id)))  # ID объекта
-                # section7 = bytearray(struct.pack("f", trasholdData))  # Величина отклика трекера
-                # section8 = bytearray(struct.pack("h", box[0]))  # Положение левого верхнего угла X
-                # section9 = bytearray(struct.pack("h", box[1]))  # Положение левого верхнего угла Y
-                # section10 = bytearray(struct.pack("h", box[2] - box[0]))  # Ширина рамки
-                # section11 = bytearray(struct.pack("h", box[3] - box[1]))  # Высота рамки
-                # section12 = bytes([0xBB])
-                # # section12 = bytes(crc8(crcdata))
+                section1 = bytes([0xAA])  # Заголовок
+                section2 = bytearray(struct.pack("I", current_milli_time() & 0xFFFFFFFF))  # Текущее время
+                section3 = bytearray(struct.pack("I", counterPhoto))  # Номер снимка
+                section4 = bytearray(struct.pack("h", frame_width))  # Ширина кадра с камеры
+                section5 = bytearray(struct.pack("h", frame_height))  # Высота кадра с камеры
+                section6 = bytearray(struct.pack("B", int(id)))  # ID объекта
+                section7 = bytearray(struct.pack("f", trasholdData))  # Величина отклика трекера
+                section8 = bytearray(struct.pack("h", box[0]))  # Положение левого верхнего угла X
+                section9 = bytearray(struct.pack("h", box[1]))  # Положение левого верхнего угла Y
+                section10 = bytearray(struct.pack("h", box[2] - box[0]))  # Ширина рамки
+                section11 = bytearray(struct.pack("h", box[3] - box[1]))  # Высота рамки
+                section12 = bytes([0xBB])
+                # section12 = bytes(crc8(crcdata))
 
-                # packed_data = (section1 + section2 + section3 + section4 + section5 + section6 +
-                #                section7 + section8 + section9 + section10 + section11 + section12)
-                # send_udp_data(packed_data)
+                packed_data = (section1 + section2 + section3 + section4 + section5 + section6 +
+                               section7 + section8 + section9 + section10 + section11 + section12)
+                send_udp_data(packed_data)
 
                 cv2.rectangle(frame, (box[0], box[1]), (box[2], box[3],), color, 2)
                 cv2.putText(
@@ -163,15 +143,16 @@ def process_video_with_tracking(input_video_path, show_video=True, save_video=Fa
 
     # Close all OpenCV windows
     cv2.destroyAllWindows()
-    return results_detect, results
+    return results
 
 
 # Example usage:
 # Запуск трекера в отдельном потоке
 # model = YOLO('train11/weights/best.pt')
 
-#model_detect = YOLO('train11/weights/best.pt')
+# model_detect = YOLO('train11/weights/best.pt')
 
-#model_detect.fuse()
-results = process_video_with_tracking('/media/pavel/data/techmash/datasets/nivaCar/IMG_4377.mov', show_video=True, save_video=False,
-                                                      output_video_path="output_video.mp4")
+# model_detect.fuse()
+results = process_video_with_tracking('/media/pavel/data/techmash/datasets/nivaCar/IMG_4377.mov', show_video=True,
+                                      save_video=False,
+                                      output_video_path="output_video.mp4")
