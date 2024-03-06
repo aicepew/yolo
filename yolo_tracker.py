@@ -89,7 +89,7 @@ def process_video_with_tracking(input_video_path, show_video=True, save_video=Fa
         if results[0].boxes.id is not None:  # this will ensure that id is not None -> exist tracks
             boxes = results[0].boxes.xyxy.cpu().numpy().astype(int)
             ids = results[0].boxes.id.cpu().numpy().astype(int)
-            print(results[0].boxes.confidence)
+            #print(results[0].boxes.confidence)
 
             for box, id in zip(boxes, ids):
                 # Generate a random color for each object based on its ID
