@@ -5,23 +5,6 @@ import socket
 import struct
 import datetime
 
-
-def crc8(data):
-    poly = 0x07
-    crc = 0x00
-
-    for byte in data:
-        crc ^= byte
-        for _ in range(8):
-            if crc & 0x80:
-                crc = (crc << 1) ^ poly
-            else:
-                crc <<= 1
-            crc &= 0xFF
-
-    return crc
-
-
 # Время в миллисекундах от начала суток
 def current_milli_time():
     current_time = datetime.datetime.now()
@@ -34,7 +17,6 @@ def current_milli_time():
 def send_udp_data(data):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.sendto(data, ("192.168.1.10", 12345))
-    # print(data)
     sock.close()
 
 
