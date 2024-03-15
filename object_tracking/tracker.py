@@ -135,8 +135,8 @@ if not ret:
     exit()
 
 init_bboxes = [
-    (frame_width // 2 - 64, frame_height // 2 - 64, 128, 128),  # Центральный объект
-    (frame_width // 4 - 64, frame_height // 4 - 64, 128, 128)   # Второй объект
+    (frame_width // 4 - 64, frame_height // 4 - 64, 128, 128),  # Центральный объект
+    (3 * frame_width // 4 - 64, 3 * frame_height // 4 - 64, 128, 128)   # Второй объект
 ]
 
 # Переменная для определения, инициализировались ли трекеры
@@ -183,6 +183,19 @@ while True:
                     cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)  # Зеленая рамка
             else:
                 success, bbox = False, None
+    
+    if trackers_initialized:
+        for tracker, init_bbox in zip(trackers, init_bboxes):
+            if tracker is not None:  # Проверяем, что трекер был инициализирован
+                # Получение центра инициализационного прямоугольника
+                init_center = (init_bbox[0] + init_bbox[2] // 2, init_bbox[1] + init_bbox[3] // 2)
+                # Получение текущего прямоугольника
+                success, bbox = tracker.update(frame)
+                if success:
+                    # Получение центра текущего прямоугольника
+                    current_center = (int(bbox[0] + bbox[2] // 2), int(bbox[1] + bbox[3] // 2))
+                    # Нарисовать линию между центром инициализации и текущим центром
+                    cv2.line(frame, init_center, current_center, (255, 0, 0), 2)  # Синий цвет линии
     
    # Отображение статуса сохранения снимков
     save_status = "save_on" if save_images else "save_off"
