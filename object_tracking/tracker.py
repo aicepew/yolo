@@ -192,8 +192,18 @@ while True:
                 # Получение текущего прямоугольника
                 success, bbox = tracker.update(frame)
                 if success:
+                    x, y, w, h = map(int, bbox)
+                    center = (x + w // 2, y + h // 2)
+
                     # Получение центра текущего прямоугольника
                     current_center = (int(bbox[0] + bbox[2] // 2), int(bbox[1] + bbox[3] // 2))
+                    init_center = (init_bbox[0] + init_bbox[2] // 2, init_bbox[1] + init_bbox[3] // 2)
+                    # Вычисление delta X и delta Y
+                    delta_x = center[0] - init_center[0]
+                    delta_y = center[1] - init_center[1]
+                    # Отображение delta X и delta Y внутри квадрата трекера
+                    cv2.putText(frame, f"Delta X: {delta_x}", (x + 10, y + h // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                    cv2.putText(frame, f"Delta Y: {delta_y}", (x + 10, y + h // 2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                     # Нарисовать линию между центром инициализации и текущим центром
                     cv2.line(frame, init_center, current_center, (255, 0, 0), 2)  # Синий цвет линии
     
